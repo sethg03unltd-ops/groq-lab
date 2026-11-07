@@ -1,12 +1,10 @@
-// Master Seth's Ebook Creative Publishing Lab — Backend (ES Module)
+// Story Lab Backend — Groq Lab
 // PERPETUAL CORE — DO NOT REMOVE / DO NOT DILUTE
-// UI may change, CORE NEVER CHANGES. Core lives HERE, not in UI.
+// This is the original master prompt core. UI may change, CORE NEVER CHANGES.
 
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-dotenv.config();
-
+const express = require("express");
+const cors = require("cors");
+require("dotenv").config();
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -14,97 +12,95 @@ app.use(express.json());
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-// PERPETUAL CORE:
-// 1. CHARACTER CONSISTENCY IS SACRED — same hair/clothes/age every page
-// 2. FULL-BLEED PICTURE BOOK, NOT MANUSCRIPT — text overlay only, never show prompt/header/footer inside book
-// 3. STORY FIRST, MORAL GENTLE — moral felt, not preachy
-// 4. DYNAMIC PAGE COUNT — NO HARD LIMIT. If user says N, make N. If AUTO, AI decides how many needed to COMPLETE book. Completeness > fixed number. NEVER force 8 or 10.
-// 5. WARM, GENTLE, CHILD-SAFE (or match category) — no scary, no clutter
-// 6. TEXT FOR READING ALOUD — short paragraphs, 2-4 sentences per story page (longer for adult/teens/guide)
-// 7. NO PROMPT LEAKAGE — reader sees ONLY Title + Story + Illustrations + Moral
-// 8. ONE BOOK = ONE LESSON = ONE WORLD — never mix brands in one book
+// ============================================================
+// PERPETUAL CORE PRINCIPLE — MASTER PROMPT (ORIGINAL)
+// ============================================================
+// 1. CHARACTER CONSISTENCY IS SACRED
+//    Same character description in EVERY page. Same hair, same clothes,
+//    same age, same features. Never redesign mid-book.
+//    If Maya has curly hair + yellow sweater + overalls on Page 1,
+//    she MUST have the same on Page 10 and Cover.
+// 2. FULL-BLEED PICTURE BOOK, NOT MANUSCRIPT
+//    Every page is a full-bleed illustration. Text is OVERLAY only,
+//    in a clean white rounded box, top or bottom depending on illustration.
+//    NEVER show illustration prompt, NEVER show header/footer labels,
+//    NEVER show "Page X of Y" inside the book.
+// 3. STORY FIRST, MORAL GENTLE, NEVER PREACHY
+//    Story must be readable alone. Moral is felt, not lectured.
+//    Moral appears ONLY on Moral Page / Back Cover, not forced in every page.
+// 4. A4 PORTRAIT, 12-PAGE BOOK STRUCTURE (FIXED)
+//    Page 1 = Front Cover (full-bleed, title integrated)
+//    Pages 2-11 = Story Pages (10 story pages, full-bleed)
+//    Page 12 = Back Cover (synopsis + final illustration + The End)
+//    NEVER change structure to 8 random pages. 12 pages = 1 complete book.
+// 5. WARM, GENTLE, CHILD-SAFE VISUAL LANGUAGE
+//    Warm watercolor / soft storybook illustration. No scary, no dark,
+//    no photorealistic, no clutter. US children's book standard.
+// 6. TEXT FOR READING ALOUD
+//    Short paragraphs, 2-4 sentences per page. Simple words.
+//    Parent can read aloud in one breath. No long walls of text.
+// 7. NO PROMPT LEAKAGE
+//    The reader NEVER sees the prompt, the system, the brand, or the tool.
+//    What the reader sees is ONLY: Title + Story + Illustrations + Moral.
+// 8. ONE BOOK = ONE LESSON = ONE WORLD
+//    One title, one set of characters, one world, one lesson.
+//    NEVER mix BaBaKuKi + 4LE + other brands in one book. NEVER halo-halo.
+// ============================================================
 
-function buildSystemPrompt(style, additional, pageCount){
-  const pageInstruction = (!pageCount || pageCount==="auto")
-    ? `PAGE COUNT: AUTO. Decide how many story pages are needed to COMPLETE this book properly. Do NOT force 8 or 10. If story needs 12, make 12. If needs 18, make 18. If needs 6, make 6. Completeness > fixed number.`
-    : `PAGE COUNT: EXACTLY ${pageCount} story pages. Do NOT make more, do NOT make less. User requested this count to complete the book.`;
-  return `You are a children's / general book author + illustrator for Master Seth's Ebook Creative Publishing Lab.
+function buildSystemPrompt(style, additional){
+  return `You are a children's picture book author + illustrator for Story Lab.
 
-PERPETUAL CORE — OBEY ALWAYS:
-1. CHARACTER CONSISTENCY: Define each character ONCE with exact hair, clothes, age, features. Use EXACT same description in every page illustration prompt.
-2. FULL-BLEED: Every story page is full-bleed illustration. Text overlay only. Never output prompt labels, headers, footers, page numbers inside book content.
-3. STORY FIRST: Warm, gentle, read-aloud friendly. Moral felt, not preachy.
-4. STRUCTURE: 1 Cover + N Story Pages + 1 Back Cover, N follows PAGE COUNT below. ${pageInstruction}
-5. STYLE: ${style || "warm, gentle, premium storybook watercolor, child-friendly"}
+PERPETUAL CORE — YOU MUST OBEY ALWAYS, NO EXCEPTIONS:
+1. CHARACTER CONSISTENCY: Define each character ONCE with exact hair, clothes, age, features. Use the EXACT same description in every single page illustration prompt. Never change outfit mid-book.
+2. FULL-BLEED PICTURE BOOK: Every page is a full-bleed illustration. Text is overlay only. Never output prompt labels, headers, footers, or page numbers inside the book content.
+3. STORY FIRST: 10 story pages, 2-4 sentences each, warm, gentle, read-aloud friendly. Moral is felt, not preachy.
+4. STRUCTURE: 12-page book total = 1 Cover + 10 Story Pages + 1 Back Cover. Return exactly 10 story pages in JSON.
+5. STYLE: Warm watercolor storybook, soft light, child-safe, US children's book. Style requested: ${style || "warm, gentle, premium storybook watercolor, child-friendly"}
 6. NO LEAKAGE: Never mention Groq, Story Lab, AI, prompt, or system in story text.
 7. ONE BOOK ONE LESSON: One title, one world, one lesson. Additional instructions: ${additional || ""}
 
-Return ONLY valid JSON:
+Return ONLY valid JSON in this exact shape:
 {
   "title": "Book Title",
-  "characters": ["Maya - 7 years old, curly dark brown hair, yellow sweater, denim overalls"],
-  "pages": [{"page": 1, "text": "Story text.", "illustration": "Full detailed illustration prompt with EXACT same character description, full-bleed, scene, no text in image"}],
+  "characters": ["Maya - 7 years old, curly dark brown hair, yellow sweater, denim overalls, warm brown eyes"],
+  "pages": [
+    {"page": 1, "text": "Story text 2-4 sentences.", "illustration": "Full detailed illustration prompt with EXACT same character description, full-bleed, warm watercolor, scene description, no text in image"}
+  ],
   "moral": "One gentle sentence moral.",
-  "backCoverSynopsis": "2-3 sentences for back cover, inviting."
+  "backCoverSynopsis": "2-3 sentences for back cover, inviting, no moral lecture."
 }
-Pages must be exactly N items, page 1 to N. Every illustration prompt MUST repeat full character description verbatim.`;
+Pages must be 10 items, page 1 to 10. Characters array must contain FULL character descriptions with hair + clothes + age. Every illustration prompt MUST repeat the full character description verbatim.`;
 }
 
 app.post("/api/story", async (req, res) => {
   try{
-    const { storyIdea, style, additional, pageCount } = req.body;
+    const { storyIdea, style, additional } = req.body;
     if(!storyIdea) return res.status(400).json({error:"storyIdea required"});
-    if(!GROQ_API_KEY) return res.status(500).json({error:"NO_GROQ_KEY: GROQ_API_KEY is missing in Render > Environment. Add it, then redeploy."});
-    const parsedPageCount = (!pageCount || pageCount==="auto") ? "auto" : String(parseInt(pageCount) || "auto");
-    // MODEL FALLBACK — llama-3.3-70b-versatile was retired by Groq (404). Try current models in order.
-    const MODELS = ["openai/gpt-oss-120b", "llama-3.1-8b-instant", "llama-3.3-70b-versatile"];
-    let r = null, j = null, lastModelError = "";
-    for (const model of MODELS) {
-      console.log("Trying Groq model:", model);
-      r = await fetch(GROQ_URL, {
-        method:"POST",
-        headers:{ "Authorization": `Bearer ${GROQ_API_KEY}`, "Content-Type":"application/json" },
-        body: JSON.stringify({
-          model,
-          temperature:0.7,
-          messages:[
-            {role:"system", content: buildSystemPrompt(style, additional, parsedPageCount)},
-            {role:"user", content: `Create a complete book (1 Cover + N Story Pages + 1 Back Cover) for this idea: ${storyIdea}. Return ONLY JSON.`}
-          ]
-        })
-      });
-      j = await r.json();
-      if (!j.error) { console.log("Groq model OK:", model); break; }
-      lastModelError = j.error?.message || JSON.stringify(j.error);
-      console.log("Groq model failed:", model, "status:", r.status, "error:", lastModelError.slice(0,300));
-      // Only fallback on model-not-found (404). If it's auth/credits (401/429), don't waste calls.
-      if (r.status !== 404 && !(lastModelError||"").toLowerCase().includes("does not exist")) break;
-    }
-    // DEBUG: log Groq status so Render Logs show the REAL reason, not just JSON.parse error
-    console.log("GROQ status:", r.status, "has_error:", !!j.error, "error:", j.error ? JSON.stringify(j.error).slice(0,500) : "none", "choices:", j.choices ? j.choices.length : 0);
-    if (j.error) {
-      // Return Groq's REAL error to UI instead of generic 500
-      return res.status(500).json({error: "GROQ_ERROR: " + (j.error.message || JSON.stringify(j.error)).slice(0,800) + " | status:" + r.status + " | Check GROQ_API_KEY in Render > Environment or credits (refills 8AM Manila)"});
-    }
+    const r = await fetch(GROQ_URL, {
+      method:"POST",
+      headers:{ "Authorization": `Bearer ${GROQ_API_KEY}`, "Content-Type":"application/json" },
+      body: JSON.stringify({
+        model:"llama-3.3-70b-versatile",
+        temperature:0.7,
+        messages:[
+          {role:"system", content: buildSystemPrompt(style, additional)},
+          {role:"user", content: `Create a complete 12-page picture book (1 Cover + 10 Story Pages + 1 Back Cover) for this idea: ${storyIdea}. Return ONLY JSON.`}
+        ]
+      })
+    });
+    const j = await r.json();
     let raw = j.choices?.[0]?.message?.content || "";
-    console.log("GROQ raw length:", raw.length, "preview:", raw.slice(0,200));
     raw = raw.replace(/```json/g,"").replace(/```/g,"").trim();
-    if (!raw) {
-      return res.status(500).json({error: "GROQ_EMPTY: Groq returned empty content. Likely causes: (1) GROQ_API_KEY invalid/expired in Render > Environment, (2) credits exhausted — refills 8AM Manila, (3) model llama-3.3-70b-versatile unavailable. Check Render Logs for GROQ status line above."});
-    }
-    let data;
-    try { data = JSON.parse(raw); }
-    catch(parseErr){
-      console.error("JSON parse failed, raw was:", raw.slice(0,1000));
-      return res.status(500).json({error: "GROQ_BAD_JSON: Groq returned non-JSON. Raw preview: " + raw.slice(0,500)});
-    }
-    if(parsedPageCount!=="auto" && data.pages && data.pages.length !== parseInt(parsedPageCount)){
-      console.warn("Page count mismatch: requested", parsedPageCount, "got", data.pages.length, "- keeping AI output, completeness wins");
+    const data = JSON.parse(raw);
+    // Perpetual Core guard: enforce 10 pages
+    if(!data.pages || data.pages.length !== 10){
+      console.warn("Perpetual Core violation: pages != 10, got", data.pages?.length);
     }
     res.json(data);
   }catch(e){ console.error(e); res.status(500).json({error:String(e.message)}); }
 });
 
-app.get("/", (req,res)=> res.send("Master Seth's Ebook Creative Publishing Lab Backend — Perpetual Core Active"));
+app.get("/", (req,res)=> res.send("Story Lab Backend — Perpetual Core Active"));
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, ()=> console.log("Running on", PORT, "— Perpetual Core Active, Dynamic Pages"));
+app.listen(PORT, ()=> console.log("Story Lab running on", PORT, "— Perpetual Core Active"));
