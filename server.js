@@ -56,19 +56,30 @@ app.post("/api/story", async (req, res) => {
     if(!storyIdea) return res.status(400).json({error:"storyIdea required"});
     if(!GROQ_API_KEY) return res.status(500).json({error:"NO_GROQ_KEY: GROQ_API_KEY is missing in Render > Environment. Add it, then redeploy."});
     const parsedPageCount = (!pageCount || pageCount==="auto") ? "auto" : String(parseInt(pageCount) || "auto");
-    const r = await fetch(GROQ_URL, {
-      method:"POST",
-      headers:{ "Authorization": `Bearer ${GROQ_API_KEY}`, "Content-Type":"application/json" },
-      body: JSON.stringify({
-        model:"llama-3.3-70b-versatile",
-        temperature:0.7,
-        messages:[
-          {role:"system", content: buildSystemPrompt(style, additional, parsedPageCount)},
-          {role:"user", content: `Create a complete book (1 Cover + N Story Pages + 1 Back Cover) for this idea: ${storyIdea}. Return ONLY JSON.`}
-        ]
-      })
-    });
-    const j = await r.json();
+    // MODEL FALLBACK — llama-3.3-70b-versatile was retired by Groq (404). Try current models in order.
+    const MODELS = ["openai/gpt-oss-120b", "llama-3.1-8b-instant", "llama-3.3-70b-versatile"];
+    let r = null, j = null, lastModelError = "";
+    for (const model of MODELS) {
+      console.log("Trying Groq model:", model);
+      r = await fetch(GROQ_URL, {
+        method:"POST",
+        headers:{ "Authorization": `Bearer ${GROQ_API_KEY}`, "Content-Type":"application/json" },
+        body: JSON.stringify({
+          model,
+          temperature:0.7,
+          messages:[
+            {role:"system", content: buildSystemPrompt(style, additional, parsedPageCount)},
+            {role:"user", content: `Create a complete book (1 Cover + N Story Pages + 1 Back Cover) for this idea: ${storyIdea}. Return ONLY JSON.`}
+          ]
+        })
+      });
+      j = await r.json();
+      if (!j.error) { console.log("Groq model OK:", model); break; }
+      lastModelError = j.error?.message || JSON.stringify(j.error);
+      console.log("Groq model failed:", model, "status:", r.status, "error:", lastModelError.slice(0,300));
+      // Only fallback on model-not-found (404). If it's auth/credits (401/429), don't waste calls.
+      if (r.status !== 404 && !(lastModelError||"").toLowerCase().includes("does not exist")) break;
+    }
     // DEBUG: log Groq status so Render Logs show the REAL reason, not just JSON.parse error
     console.log("GROQ status:", r.status, "has_error:", !!j.error, "error:", j.error ? JSON.stringify(j.error).slice(0,500) : "none", "choices:", j.choices ? j.choices.length : 0);
     if (j.error) {
