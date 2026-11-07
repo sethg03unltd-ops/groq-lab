@@ -54,6 +54,7 @@ app.post("/api/story", async (req, res) => {
   try{
     const { storyIdea, style, additional, pageCount } = req.body;
     if(!storyIdea) return res.status(400).json({error:"storyIdea required"});
+    if(!GROQ_API_KEY) return res.status(500).json({error:"NO_GROQ_KEY: GROQ_API_KEY is missing in Render > Environment. Add it, then redeploy."});
     const parsedPageCount = (!pageCount || pageCount==="auto") ? "auto" : String(parseInt(pageCount) || "auto");
     const r = await fetch(GROQ_URL, {
       method:"POST",
@@ -68,9 +69,24 @@ app.post("/api/story", async (req, res) => {
       })
     });
     const j = await r.json();
+    // DEBUG: log Groq status so Render Logs show the REAL reason, not just JSON.parse error
+    console.log("GROQ status:", r.status, "has_error:", !!j.error, "error:", j.error ? JSON.stringify(j.error).slice(0,500) : "none", "choices:", j.choices ? j.choices.length : 0);
+    if (j.error) {
+      // Return Groq's REAL error to UI instead of generic 500
+      return res.status(500).json({error: "GROQ_ERROR: " + (j.error.message || JSON.stringify(j.error)).slice(0,800) + " | status:" + r.status + " | Check GROQ_API_KEY in Render > Environment or credits (refills 8AM Manila)"});
+    }
     let raw = j.choices?.[0]?.message?.content || "";
+    console.log("GROQ raw length:", raw.length, "preview:", raw.slice(0,200));
     raw = raw.replace(/```json/g,"").replace(/```/g,"").trim();
-    const data = JSON.parse(raw);
+    if (!raw) {
+      return res.status(500).json({error: "GROQ_EMPTY: Groq returned empty content. Likely causes: (1) GROQ_API_KEY invalid/expired in Render > Environment, (2) credits exhausted — refills 8AM Manila, (3) model llama-3.3-70b-versatile unavailable. Check Render Logs for GROQ status line above."});
+    }
+    let data;
+    try { data = JSON.parse(raw); }
+    catch(parseErr){
+      console.error("JSON parse failed, raw was:", raw.slice(0,1000));
+      return res.status(500).json({error: "GROQ_BAD_JSON: Groq returned non-JSON. Raw preview: " + raw.slice(0,500)});
+    }
     if(parsedPageCount!=="auto" && data.pages && data.pages.length !== parseInt(parsedPageCount)){
       console.warn("Page count mismatch: requested", parsedPageCount, "got", data.pages.length, "- keeping AI output, completeness wins");
     }
